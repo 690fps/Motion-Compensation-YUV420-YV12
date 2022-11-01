@@ -9,17 +9,23 @@
 using namespace std;
 using namespace std::chrono;
 
-int blockSize = 32;
-int width = 352;
-int height = 288;
+static int blockSize = 32;
+static int width = 352;
+static int height = 288;
+static int frames = 10;
 
 typedef vector<uint8_t> byteVec;
 
+void error(string text) {
+    printf("%s", text.c_str());
+    getchar();
+    exit(1);
+}
+
 byteVec getBlock(const byteVec& buffer, int x, int y, int stride, int compSize) {
+    if (!(x >= 0 && x + compSize-1 < width && y >= 0 && y + compSize-1 < height))
+        error("Error accessing outside buffer");
     byteVec out;
-    if (!(x >= 0 && x + compSize-1 < width && y >= 0 && y + compSize-1 < height)) {
-        return out;
-    }
     for (int i = 0; i < compSize; i++) {
         auto start = buffer.begin() + (y+i) * stride + x;
         out.insert(out.end(), start, start + compSize);
@@ -31,9 +37,6 @@ void processBlock(const byteVec inputCur[], const byteVec inputRef[], byteVec ou
     unsigned long minAbsDif = ULONG_MAX;
     int bestX = -1;
     int bestY = -1;
-    byteVec curBlock = getBlock(inputCur[0], x, y, stride, blockSize);
-    byteVec refBlock;
-
     //find prediction MV
     int minX = max(0, x - blockSize);
     int minY = max(0, y - blockSize);
@@ -59,60 +62,62 @@ void processBlock(const byteVec inputCur[], const byteVec inputRef[], byteVec ou
         }
     }
 
-    //use MV to get prediction and difference
-    if (bestX >= 0 && bestY >= 0) {
-        printf("\tBlock\t(%d, \t%d)\tMV => (%d, %d) \n", x, y, bestX - x, bestY - y);
-        for (int comp = 0; comp < 3; comp++) {
-            int subs =  comp ? 1 : 0;
-            int compX = x >> subs;
-            int compY = y >> subs;
-            int compBestX = bestX >> subs;
-            int compBestY = bestY >> subs;
-            int compSize = blockSize >> subs;
-            int compStride = stride >> subs;
-            byteVec bestBlock = getBlock(inputRef[comp], compBestX, compBestY, compStride, compSize);
-            curBlock = getBlock(inputCur[comp], compX, compY, compStride, compSize);
-
-            //write prediction block
-            for (int line = 0; line < compSize; line++) {
-                auto outBuff = outPred[comp].begin() + (compY + line) * compStride + compX;
-                auto begin = bestBlock.begin() + line * compSize;
-                copy(begin, begin + compSize, outBuff);
-            }
-            //write difference block
-            vector<int16_t> differenceBlock;
-            for (int i = 0; i < bestBlock.size(); i++) {
-                differenceBlock.push_back(curBlock[i] - bestBlock[i] + 255); //255 is offset to avoid negative values in YUV viewer
-            }
-            for (int line = 0; line < compSize; line++) {
-                auto outBuff = outDiff[comp].begin() + (compY + line) * compStride + compX;
-                auto begin = differenceBlock.begin() + line * compSize;
-                copy(begin, begin + compSize, outBuff);
-            }
-        }
-    } else {
+    if (bestX < 0 || bestY < 0) {
         printf("Error searching motion vector\n");
+        return;
+    }
+    //use MV to get prediction and difference
+    printf("\tBlock\t(%d, \t%d)\tMV => (%d, %d) \n", x, y, bestX - x, bestY - y);
+    byteVec curBlock(blockSize);
+    byteVec bestBlock(blockSize);
+    for (int comp = 0; comp < 3; comp++) {
+        int subs =  comp ? 1 : 0;
+        int compX = x >> subs;
+        int compY = y >> subs;
+        int compBestX = bestX >> subs;
+        int compBestY = bestY >> subs;
+        int compSize = blockSize >> subs;
+        int compStride = stride >> subs;
+        bestBlock = getBlock(inputRef[comp], compBestX, compBestY, compStride, compSize);
+        curBlock = getBlock(inputCur[comp], compX, compY, compStride, compSize);
+        //write prediction block
+        for (int line = 0; line < compSize; line++) {
+            auto outBuff = outPred[comp].begin() + (compY + line) * compStride + compX;
+            auto begin = bestBlock.begin() + line * compSize;
+            copy(begin, begin + compSize, outBuff);
+        }
+        //write difference block
+        vector<int16_t> differenceBlock;
+        for (int i = 0; i < bestBlock.size(); i++) {
+            differenceBlock.push_back(curBlock[i] - bestBlock[i] + 255); //255 is offset to avoid negative values in YUV viewer
+        }
+        for (int line = 0; line < compSize; line++) {
+            auto outBuff = outDiff[comp].begin() + (compY + line) * compStride + compX;
+            auto begin = differenceBlock.begin() + line * compSize;
+            copy(begin, begin + compSize, outBuff);
+        }
     }
     return;
 }
 
-void error(string text) {
-    printf("%s", text.c_str());
-    getchar();
-    exit(1);
-}
-
-int main()
+int main(int argc, char **argv)
 {
-    int frames = 10;
+    if (argc != 6) {
+        error("Usage: .exe Filename Width Heiht FramesToProcess");
+    }
+    string path = filesystem::current_path().string() + "/" + argv[1];
+    width = strtol(argv[2], NULL, 10);
+    height = strtol(argv[3], NULL, 10);
+    blockSize = strtol(argv[4], NULL, 10);
+    frames = strtol(argv[5], NULL, 10);
+
 
     int lumaSize = width * height;
     int chromaSize = lumaSize >> 2;
     //std::string path1 = filesystem::current_path().string() + "/akiyo_cif.yuv";
-    string path1 = filesystem::current_path().string() + "/foreman_cif.yuv";
-    ifstream file(path1, std::ios::in | std::ios::binary | std::ios::ate);
+    ifstream file(path, std::ios::in | std::ios::binary | std::ios::ate);
     if (!file)
-        error("Error opening file");
+        error("Error opening file: " + path);
     auto end = file.tellg();
     file.seekg(0, ios::beg);
     auto fileSize = size_t(end - file.tellg());
