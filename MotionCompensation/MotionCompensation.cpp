@@ -161,11 +161,14 @@ int main()
             reference[2] = current[2];
         }
         auto start = chrono::high_resolution_clock::now();
-        for (int y = 0; y < height; y += blockSize) {
-            for (int x = 0; x < width; x += blockSize) {
-                processBlock(current, reference, prediction, difference, x, y, width);
+        for_each(
+            execution::par_unseq,
+            blocks.begin(),
+            blocks.end(),
+            [&](auto&& blockXY) {
+                processBlock(current, reference, prediction, difference, blockXY.first, blockXY.second, width);
             }
-        }
+        );
         auto stop = high_resolution_clock::now();
         auto duration = duration_cast<milliseconds>(stop - start);
         printf("Frame processed in: %d ms \n", duration);
