@@ -1,6 +1,3 @@
-// MotionCompensation.cpp : This file contains the 'main' function. Program execution begins and ends there.
-//
-
 #include <iostream>
 #include <stdlib.h>
 #include <vector>
@@ -30,8 +27,6 @@ byteVec getBlock(const byteVec& buffer, int x, int y, int stride, int compSize) 
     return out;
 };
 
-}
-
 void processBlock(const byteVec inputCur[], const byteVec inputRef[], byteVec outPred[], vector<int16_t> outDiff[], int x, int y, int stride) {
     unsigned long minAbsDif = ULONG_MAX;
     int bestX = -1;
@@ -53,6 +48,8 @@ void processBlock(const byteVec inputCur[], const byteVec inputRef[], byteVec ou
                 for (int ii = 0; ii < blockSize; ii++) {
                     dif += abs(curLine[ii] - refLine[ii]);
                 }
+                if (dif >= minAbsDif)
+                    break;
             }
             if (dif < minAbsDif) {
                 minAbsDif = dif;
@@ -192,5 +189,4 @@ int main()
     printf("Process finished\n\n");
     getchar();
     return 0;
-
 }
