@@ -30,8 +30,6 @@ byteVec getBlock(const byteVec& buffer, int x, int y, int stride, int compSize) 
     return out;
 };
 
-const uint8_t& getPixel(const byteVec& buffer, int x, int y, int stride) {
-    return buffer[y*stride + x];
 }
 
 void processBlock(const byteVec inputCur[], const byteVec inputRef[], byteVec outPred[], vector<int16_t> outDiff[], int x, int y, int stride) {
@@ -50,8 +48,10 @@ void processBlock(const byteVec inputCur[], const byteVec inputRef[], byteVec ou
         for (int i = minX; i <= maxX; i++) {
             unsigned long dif = 0;
             for (int jj = 0; jj < blockSize; jj++) {
+                const uint8_t* curLine = &(inputCur[0][(y+jj)*stride + x]);
+                const uint8_t* refLine = &(inputRef[0][(j+jj)*stride + i]);
                 for (int ii = 0; ii < blockSize; ii++) {
-                    dif += abs(getPixel(inputCur[0], x+ii, y+jj, stride) - getPixel(inputRef[0], i+ii, j+jj, stride));
+                    dif += abs(curLine[ii] - refLine[ii]);
                 }
             }
             if (dif < minAbsDif) {
