@@ -12,7 +12,8 @@ using namespace std::chrono;
 static int blockSize = 32;
 static int width = 352;
 static int height = 288;
-static int frames = 10;
+static int frames = 20;
+static string path = filesystem::current_path().string() + "/foreman_cif.yuv";
 
 typedef vector<uint8_t> byteVec;
 
@@ -31,7 +32,7 @@ byteVec getBlock(const byteVec& buffer, int x, int y, int stride, int compSize) 
         out.insert(out.end(), start, start + compSize);
     }
     return out;
-};
+}
 
 void processBlock(const byteVec inputCur[], const byteVec inputRef[], byteVec outPred[], vector<int16_t> outDiff[], int x, int y, int stride) {
     unsigned long minAbsDif = ULONG_MAX;
@@ -89,7 +90,7 @@ void processBlock(const byteVec inputCur[], const byteVec inputRef[], byteVec ou
         //write difference block
         vector<int16_t> differenceBlock;
         for (int i = 0; i < bestBlock.size(); i++) {
-            differenceBlock.push_back(curBlock[i] - bestBlock[i] + 255); //255 is offset to avoid negative values in YUV viewer
+            differenceBlock.push_back(curBlock[i] - bestBlock[i]); //use +255 offset to avoid negative values in YUV viewer
         }
         for (int line = 0; line < compSize; line++) {
             auto outBuff = outDiff[comp].begin() + (compY + line) * compStride + compX;
@@ -102,19 +103,17 @@ void processBlock(const byteVec inputCur[], const byteVec inputRef[], byteVec ou
 
 int main(int argc, char **argv)
 {
-    if (argc != 6) {
-        error("Usage: .exe Filename Width Heiht FramesToProcess");
-    }
-    string path = filesystem::current_path().string() + "/" + argv[1];
-    width = strtol(argv[2], NULL, 10);
-    height = strtol(argv[3], NULL, 10);
-    blockSize = strtol(argv[4], NULL, 10);
-    frames = strtol(argv[5], NULL, 10);
-
+    //if (argc != 6) {
+    //    error("Usage: .exe Filename Width Heiht FramesToProcess");
+    //}
+    //path = filesystem::current_path().string() + "/" + argv[1];
+    //width = strtol(argv[2], NULL, 10);
+    //height = strtol(argv[3], NULL, 10);
+    //blockSize = strtol(argv[4], NULL, 10);
+    //frames = strtol(argv[5], NULL, 10);
 
     int lumaSize = width * height;
     int chromaSize = lumaSize >> 2;
-    //std::string path1 = filesystem::current_path().string() + "/akiyo_cif.yuv";
     ifstream file(path, std::ios::in | std::ios::binary | std::ios::ate);
     if (!file)
         error("Error opening file: " + path);
